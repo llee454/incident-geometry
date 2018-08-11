@@ -1,6 +1,4 @@
 (*
-  zojirushi $20 
-
   This module defines an abstract theory of
   Incidence geoemetry.
 *)
