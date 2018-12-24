@@ -1,4 +1,6 @@
 (*
+  5:59 7:55 coding
+  3:57 4:45 coding
   zojirushi $20 
 
   This module defines an abstract theory of
@@ -976,6 +978,50 @@ Definition point_list_sublist_subset
   and should probably redefine points_distinct
   to align my code with the standard lib.
 *)
+Definition point_set_list_cut
+  :  forall (p : point) (ps : list point),
+     point_list_distinct ps -> 
+     In p ps ->
+     {x : ((list point) * (list point)) |
+       ps = (fst x) ++ (p :: (snd x))}
+  := fun p 
+       => let T ps x := ps = (fst x) ++ (p :: (snd x)) in
+          let U ps := {x : ((list point) * (list point)) | T ps x} in
+          list_rect
+            (fun ps => point_list_distinct ps -> In p ps -> U ps)
+            (fun _ (H : False)
+              => False_rect (U nil) H)
+            (fun p0 ps
+              (F : point_list_distinct ps -> In p ps -> U ps)
+              (H : point_list_distinct (p0 :: ps))
+              (H0 : In p (p0 :: ps))
+              => let G
+                   :  In p ps -> U ps
+                   := F (point_list_distinct_tail p0 ps H) in
+                 sumbool_rec (* over point_eq_dec q0 p *)
+                   (fun _ => U (p0 :: ps))
+                   (fun H1 : p0 = p
+                     => let x := (nil, ps) in
+                        exist
+                          (T (p0 :: ps))
+                          x
+                          (eq_sym (app_nil_l (p0 :: ps))
+                            || p0 :: ps = nil ++ (a :: ps) @a by <- H1))
+                   (fun H1 : p0 <> p
+                     => sumbool_rec (* over In p (p0 :: ps) *)
+                          (fun _ => U (p0 :: ps))
+                          (fun H2 : p0 = p
+                            => False_rec (U (p0 :: ps)) (H1 H2))
+                          (fun H2 : In p ps
+                            => let (x, H3) := G H2 in
+                               exist
+                                 (T (p0 :: ps))
+                                 (p0 :: fst x, snd x)
+                                 (eq_refl (p0 :: ps)
+                                   || p0 :: ps = p0 :: a @a by <- H3
+                                   || p0 :: ps = a @a by <- app_comm_cons (fst x) (p :: snd x) p0))
+                          (point_list_In_destr p p0 ps H0))
+                   (point_eq_dec p0 p)).
 
 (*
   TODO: This function is underspecified,
@@ -1098,43 +1144,6 @@ Definition point_set_list_remove_subset
             => proj2 ((proj2 (H q)) H0).
 
 Set Opaque point_set_list_remove_subset.
-
-(*
-Definition sublist_distinct
-  :  forall ps qs, point_list_distinct qs -> set_list_subset ps qs -> point_list_distinct ps 
-
-  we have point_list_different sublist
-  ps is a sublist of qs
-  for every point ..
-
-  our problem is that sublist currently means subset. The current definitionn loses the order relations.
-  But even still. this intuitively holds. stated intuitively
-
-  if every element in qs is distinct and we remove some elements every remaining element is still distinct because we never added any elements.
-  now first, the goal says nothing about removing elements, we just know that we can produce a sublist(subset) by removing elements.
-  ! we can proceed by contradiction. Let's say that .... ugh! we can have a non distinct sublist. [x x] is a sublist of [x] under the current definition.
-
-  we have to rename sublist!
-
-  list_set_subset
-
-
-
-
-
-  let qs = q0 :: qs
-  either q0 is in ps 
-
-
-  let p0 :: ps
-  p0 is in qs
-  
-
-  p0 is either in qs or not
-  
-*)
-
-                        
 
 (*
   Accepts a line and a list of points and returns
