@@ -1,8 +1,4 @@
 (*
-  5:59 7:55 coding
-  3:57 4:45 coding
-  zojirushi $20 
-
   This module defines an abstract theory of
   Incidence geoemetry.
 *)
