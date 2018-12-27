@@ -8,6 +8,7 @@ Require Import List.
 Require Import Bool.
 Require Import Classical.
 Require Import Description.
+Require Import PeanoNat.
 
 Module Incidence.
 
@@ -88,7 +89,7 @@ Structure Incidence : Type := incidence {
     at least two distinct points P and Q such
     that both P and Q lie on l.
   *)
-  line_points_axiom : forall l : line, exists p : point, exists q : point, p <> q -> on l p = true /\ on l q = true;
+  line_points_axiom : forall l : line, exists p : point, exists q : point, p <> q /\ on l p = true /\ on l q = true;
 
   (*
     Asserts that there exists three points that
@@ -111,6 +112,7 @@ Arguments parallel {i} l m.
 Arguments nonparallel {i} l m.
 Arguments points_line_axiom {i} p q H.
 Arguments line_points_axiom {i} l.
+Arguments collinearity_axiom {i}.
 
 Section Theorems.
 
@@ -153,7 +155,7 @@ Proof ex_ind (fun p : point =>
                        (proj2 (proj2 (proj1 H)))))
                (points_line_axiom p q
                  (proj1 (proj1 H))))))
-     (collinearity_axiom g).
+     collinearity_axiom.
 
 (*
   Proves that every pair of nonparallel lines
@@ -200,6 +202,95 @@ Proof fun l m H H0
                                       || a = m @a by <- (proj2 H4) l H5))))
                             (points_line_axiom p q H3))
                      (point_eq_dec p q))).
+
+(*
+  Accepts a point [p], a line [l], and a proof
+  that [p] is not on the line [l], and proves
+  that [p] is different from every point on [l].
+*)
+Theorem not_on_different
+  :  forall (p : point) (l : line), on l p = false -> forall q : point, on l q = true -> q <> p.
+Proof
+  fun p l H q H0
+    => sumbool_ind
+         (fun _ => q <> p)
+         (fun H1 : q = p
+           => False_ind (q <> p)
+                (diff_false_true
+                  (H0
+                   || on l a = true @a by <- H1
+                   || a = true      @a by <- H)))
+         (fun H1 : q <> p
+           => H1)
+         (point_eq_dec q p).
+
+(*
+  Proves that for every line, there exists a point that is not on
+  the line.
+*)
+Theorem point_not_on_line_ex
+  :  forall l : line, exists p : point, on l p = false.
+Proof
+  fun l
+    => ex_ind (fun (p : point) H =>
+       ex_ind (fun (q : point) H0 =>
+       ex_ind (fun (r : point) (H1 : distinct p q r /\ noncollinear p q r)
+         => sumbool_ind
+              (fun _ => exists s : point, on l s = false)
+              (fun H2 : on l p = true
+                => sumbool_ind
+                     (fun _ => exists s : point, on l s = false)
+                     (fun H3 : on l q = true
+                       => sumbool_ind
+                            (fun _ => exists s : point, on l s = false)
+                            (fun H4 : on l r = true
+                              => False_ind _
+                                   ((proj2 H1)
+                                     (ex_intro _
+                                       l
+                                       (conj H2 (conj H3 H4)))))
+                            (fun H4 : on l r = false
+                              => ex_intro _ r H4)
+                            (bool_dec0 (on l r)))
+                     (fun H3 : on l q = false
+                       => ex_intro _ q H3)
+                     (bool_dec0 (on l q)))
+              (fun H2 : on l p = false
+                => ex_intro _ p H2)
+              (bool_dec0 (on l p)))
+       H0) H) collinearity_axiom.
+
+(*
+*)
+(*
+Theorem other_point
+  :  forall p : point, exists q : point, p <> q.
+Proof
+  fun p : point
+    => ex_ind (fun (q : point) H =>
+       ex_ind (fun (r : point) H0 =>
+       ex_ind (fun (s : point) (H1 : distinct q r s /\ noncollinear q r s)
+         => sumbool_ind
+              (fun _ => exists t : point, p <> t)
+              (fun H2 : 
+*)
+(*
+  For every point, there exists two distinct lines that the point
+  lines on.
+*)
+(*
+Theorem point_on_lines
+  :  forall p : point, exists l : line, exists m : line, l <> m /\ on l p = true /\ on m p = true.
+Proof
+  fun p : point
+*) 
+
+(*
+*)
+Theorem point_list_In_dec
+  :  forall (p : point) (ps : list point),
+     {In p ps} + {~ In p ps}.
+Proof in_dec point_eq_dec.
 
 (*
   Accepts two arguments, a point, p, and a list
@@ -631,7 +722,7 @@ Proof fun xs ys H z w (H0 : In w (z :: xs))
             (point_eq_dec z w).
 
 (*
-  Proves that the tail of a list is a subset
+  roves that the tail of a list is a subset
   of the list.
 *)
 Theorem set_list_subset_tail
@@ -746,36 +837,6 @@ Proof fun p q qs H H0
        => or_ind 
             (fun H1 : q = p => H H1)
             (fun H1 : In p qs => H0 H1).
-
-(*
-  Proves that given a point, p, and a list of
-  points, ps, we can determine whether or not
-  p is in ps.
-*)
-Theorem point_list_In_dec
-  :  forall (p : point) (ps : list point), {In p ps} + {~ In p ps}.
-Proof fun p
-       => list_rec
-            (fun ps => {In p ps} + {~ In p ps})
-            (right (In p nil)
-              (fun H : In p nil => H))
-            (fun q qs (F : {In p qs} + {~ In p qs})
-              => sumbool_rec
-                   (fun _ => {In p (q :: qs)} + {~ In p (q :: qs)})
-                   (fun H : q = p
-                     => left (~ In p (q :: qs))
-                          (or_introl (In p qs) H))
-                   (fun H : q <> p
-                     => sumbool_rec
-                          (fun _ => {In p (q :: qs)} + {~ In p (q :: qs)})
-                          (fun H0 : In p qs
-                            => left (~ In p (q :: qs))
-                                 (or_intror (q = p) H0))
-                          (fun H0 : ~ In p qs
-                            => right (In p (q :: qs))
-                                 (point_list_not_In p q qs H H0))
-                          F)
-                   (point_eq_dec q p)).
 
 (*
   Proves that given a point, p, and a list of
@@ -958,6 +1019,187 @@ Definition point_set_list_cut
                             || p0 :: ps = p0 :: a @a by <- H3
                             || p0 :: ps = a @a by <- app_comm_cons (fst x) (p :: snd x) p0))
                    (point_list_In_destr p p0 ps H0)).
+
+(*
+  Accepts a point [p] and a list of points [ps]
+  and removes [p] from [ps].
+*)
+Definition point_set_list_delete
+  :  forall (p : point) (ps : list point),
+     point_list_distinct ps ->
+     list point
+  := fun p ps H
+       => sumbool_rec
+            (fun _ => list point)
+            (fun H0 : In p ps
+              => sig_rec
+                   (fun _ => list point)
+                   (fun qs _
+                     => (fst qs ++ snd qs))
+                   (point_set_list_cut p ps H H0))
+            (fun _ : ~ In p ps
+              => ps)
+            (point_list_In_dec p ps).
+
+(*
+  Proves that deleting a point [p] from a list
+  [ps] of distinct points results in a list that
+  is either the same size or one element smaller.
+*)
+Theorem point_set_list_delete_length
+  :  forall (p : point) (ps : list point) (H : point_list_distinct ps),
+     let ps_len := length ps in
+     let qs_len := length (point_set_list_delete p ps H) in
+     (ps_len = qs_len \/ ps_len = S qs_len).
+Proof fun p ps H
+        => let T
+             := let ps_len := length ps in
+                let qs_len := length (point_set_list_delete p ps H) in
+                (ps_len = qs_len \/ ps_len = S qs_len) in
+           sumbool_ind
+             (fun H0 => point_list_In_dec p ps = H0 -> T)
+             (fun (H0 : In p ps) (H9 : point_list_In_dec p ps = left H0)
+               => sig_rec
+                    (fun qsH1
+                      => point_set_list_cut p ps H H0 = qsH1 -> T)
+                    (fun qs (H1 : ps = fst qs ++ p :: (snd qs))
+                      (H8 : point_set_list_cut p ps H H0 = exist _ qs H1)
+                      => ltac:(
+                           unfold T;
+                           unfold point_set_list_delete;
+                           replace (point_list_In_dec p ps);
+                           simpl;
+                           replace (point_set_list_cut p ps H H0);
+                           exact
+                             (or_intror _
+                               ((f_equal (length (A := point)) H1 : (length ps = length (fst qs ++ (p :: (snd qs)))))
+                                 || length ps = a @a by <- app_length (fst qs) (p :: snd qs) (* length ps = length (fst qs) + length (p :: snd qs) = length (fst qs) + S (length (snd qs)) *)
+                                 || length ps = a @a by <- Nat.add_succ_r (length (fst qs)) (length (snd qs))
+                                 || length ps = S a @a by app_length (fst qs) (snd qs)))))
+                    (point_set_list_cut p ps H H0)
+                    (eq_refl (point_set_list_cut p ps H H0)))
+             (fun (H0 : ~ In p ps) (H9 : point_list_In_dec p ps = right H0)
+               => ltac:(
+                    unfold T;
+                    unfold point_set_list_delete;
+                    replace (point_list_In_dec p ps);
+                    exact
+                      (or_introl _
+                        (eq_refl (length ps)))))
+             (point_list_In_dec p ps)
+             (eq_refl (point_list_In_dec p ps)).
+
+Axiom app_nil
+  :  forall (A : Set) (xs ys : list A),
+     nil = xs ++ ys ->
+     xs = nil /\ ys = nil.
+
+Axiom hd_eq
+  :  forall x xs y ys, x :: xs = y :: ys -> x = y.
+
+Axiom tl_eq
+  :  forall x xs y ys, x :: xs = y :: ys -> xs = ys.
+
+(*
+*)
+Theorem point_set_list_distinct_parts
+  :  forall ps : list point, point_list_distinct ps ->
+       forall qs rs : list point,
+         ps = qs ++ rs ->
+         (point_list_distinct qs /\ point_list_distinct rs).
+Proof point_list_distinct_ind
+        (fun ps => _)
+        (fun qs rs (H : nil = qs ++ rs)
+          => conj
+               (point_list_distinct_nil || point_list_distinct a @a by (proj1 (app_nil qs rs H)))
+               (point_list_distinct_nil || point_list_distinct a @a by (proj2 (app_nil qs rs H))))
+        (fun p ps (H : point_list_different p ps) (H0 : point_list_distinct ps) 
+          (H1 : forall qs rs, ps = qs ++ rs -> _)
+          => list_ind _ (* qs *)
+               (fun rs (H2 : p :: ps = nil ++ rs)
+                 => conj 
+                      point_list_distinct_nil
+                      (point_list_distinct_cons p ps H H0
+                        || point_list_distinct a @a by H2
+                        || point_list_distinct a @a by app_nil_l rs))
+              (fun q qs
+                (H2 : forall rs, p :: ps = qs ++ rs -> _)
+                rs
+                (H3 : p :: ps = (q :: qs) ++ rs)
+                => (* goal: point_list_distinct (q :: qs) /\ point_list_distinct rs *)
+                   let H4
+                     :  point_list_distinct qs /\ point_list_distinct rs
+                     :  (H1 qs rs (tl_eq H3)) in
+                   conj
+                     (point_list_distinct_cons q qs
+                       (* point_list_different q qs *)
+                      
+             
+          qs rs (H2 : p :: ps = qs ++ rs)
+
+About point_list_distinct_ind.
+
+(*
+*)
+Axiom point_set_list_different_parts
+  :  forall ps : list point, point_list_distinct ps ->
+       forall qs rs : list point,
+         ps = qs ++ rs ->
+         ((forall r : point, In r rs -> point_list_different r qs) /\
+          (forall q : point, In q qs -> point_list_different q rs)).
+
+(*
+*)
+Axiom point_list_different_app
+  :  forall (p : point) (ps qs : list point),
+       point_list_different p ps ->
+       point_list_different p qs ->
+       point_list_different p (ps ++ qs).
+
+(*
+*)
+Theorem point_set_list_delete_different
+  :  forall (p : point) (ps : list point) (H : point_list_distinct ps),
+     point_list_different p (point_set_list_delete p ps H).
+Proof fun p ps H
+        => let T
+             := point_list_different p (point_set_list_delete p ps H) in
+           sumbool_ind
+             (fun H0
+               => point_list_In_dec p ps = H0 -> T)
+             (fun (H0 : In p ps) (H1 : point_list_In_dec p ps = left H0)
+               => sig_ind
+                    (fun qsH2
+                      => point_set_list_cut p ps H H0 = qsH2 -> T)
+                    (fun qs (H2 : ps = fst qs ++ (p :: snd qs))
+                      (H3 : point_set_list_cut p ps H H0 = exist _ qs H2)
+                      => ltac:(
+                           unfold T;
+                           unfold point_set_list_delete;
+                           replace (point_list_In_dec p ps);
+                           simpl;
+                           replace (point_set_list_cut p ps H H0);
+                           exact
+                             (* goal: point_list_different p (fst qs ++ snd qs) *)
+                             (point_list_different_app p (fst qs) (snd qs)
+                               (proj1
+                                 (point_set_list_different_parts ps H (fst qs) (p :: snd qs) H2)
+                                 p
+                                 (or_introl _ (eq_refl p)))
+                               (point_list_distinct_different p (snd qs)
+                                 (proj2 (point_set_list_distinct_parts ps H (fst qs) (p :: snd qs) H2))))))
+                    (point_set_list_cut p ps H H0)
+                    (eq_refl (point_set_list_cut p ps H H0)))
+             (fun (H0 : ~ In p ps) (H9 : point_list_In_dec p ps = right H0)
+               => ltac:(
+                    unfold T;
+                    unfold point_set_list_delete;
+                    replace (point_list_In_dec p ps);
+                    exact
+                      (* goal: point_list_different p ps *)
+                      (point_list_not_In_different p ps H0)))
+             (point_list_In_dec p ps)
+             (eq_refl (point_list_In_dec p ps)).
 
 (*
   TODO: This function is underspecified,
