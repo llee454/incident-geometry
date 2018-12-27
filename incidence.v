@@ -577,6 +577,16 @@ Proof fun p qs H
        => proj2 (Forall_forall (fun q => q <> p) qs) H.
 
 (*
+  Accepts a point [p] and a list of points [ps], and proves that,
+  if every point in [ps] is different than [p] then any point
+  belonging to [ps] is different than [p].
+*)
+Theorem point_list_different_neq
+  :  forall (p : point) (qs : list point), point_list_different p qs -> (forall q : point, In q qs -> q <> p).
+Proof fun p qs H
+        => proj1 (Forall_forall (fun q => q <> p) qs) H.
+
+(*
   Accepts a point, p, and a list of points, qs,
   and proves that, if every point, q, in qs is
   not equal to p according to points_neqb then
@@ -945,6 +955,103 @@ Proof point_list_sublist_ind
                    H2).
 
 (*
+*)
+Theorem set_list_subset_parts
+  :  forall (A : Set) (ps qs rs : list A),
+     ps = qs ++ rs ->
+     set_list_subset qs ps /\
+     set_list_subset rs ps.
+Proof
+  fun A ps qs rs H
+    => conj
+         (fun q (H0 : In q qs)
+           => proj2 (in_app_iff qs rs q) (or_introl _ H0)
+              || In q a @a by H)
+         (fun r (H0 : In r rs)
+           => proj2 (in_app_iff qs rs r) (or_intror _ H0)
+              || In r a @a by H).
+
+Arguments set_list_subset_parts {A} ps qs rs.
+
+(*
+*)
+Axiom point_set_list_sublist_parts
+  :  forall ps : list point, point_list_distinct ps ->
+       forall qs rs : list point,
+         ps = qs ++ rs ->
+         point_list_sublist qs ps /\
+         point_list_sublist rs ps.
+  
+
+(*
+  Accepts a point [p] and a list [ps] that
+  contains points different than [p], and proves
+  that [p] is different from every point in
+  every sublist of [ps].
+*)
+Theorem point_list_different_sublist
+  :  forall (p : point) (qs : list point), 
+       point_list_different p qs ->
+       forall (rs : list point),
+         point_list_sublist rs qs -> 
+         point_list_different p rs.
+Proof
+  fun p qs H rs H0
+    => let H1
+         :  forall q, In q qs -> q <> p
+         := point_list_different_neq p qs H in
+       point_list_neq_different p rs
+         (fun r (H2 : In r rs)
+           => H1 r ((point_list_sublist_subset rs qs H0) r H2)).
+
+(*
+  Proves that every sublist of a distinct list
+  is also distinct.
+*)
+Theorem point_set_list_distinct_sublist
+  :  forall ps : list point, point_list_distinct ps ->
+       forall qs : list point, point_list_sublist qs ps ->
+         point_list_distinct qs.
+Proof
+  fun ps H qs H0
+    => point_list_sublist_ind
+         (fun qs rs => point_list_distinct rs -> point_list_distinct qs)
+         (fun _ => point_list_distinct_nil)
+         (fun q0 qs r0 rs
+           (_  : point_list_sublist (q0 :: qs) rs)
+           (H1 : point_list_distinct rs -> point_list_distinct (q0 :: qs))
+           (H2 : point_list_distinct (r0 :: rs))
+           => H1 (point_list_distinct_tail r0 rs H2))
+         (fun q0 qs r0 rs
+           (H1 : q0 = r0)
+           (H2 : point_list_sublist qs rs)
+           (H3 : point_list_distinct (rs) -> point_list_distinct qs)
+           (H4 : point_list_distinct (r0 :: rs)) 
+           => point_list_distinct_cons q0 qs
+                (point_list_different_sublist r0 rs
+                  (point_list_distinct_different r0 rs H4)
+                  qs H2
+                  || point_list_different a qs @a by H1)
+                (H3 (point_list_distinct_tail r0 rs H4)))
+         qs ps H0 H. 
+
+(*
+*)
+Theorem point_set_list_distinct_parts
+  :  forall (ps : list point), point_list_distinct ps ->
+       forall qs rs : list point,
+         ps = qs ++ rs ->
+         (point_list_distinct qs /\ point_list_distinct rs).
+ Proof
+  fun ps H qs rs H0
+    => let H1
+         :  point_list_sublist qs ps /\ point_list_sublist rs ps
+         := point_set_list_sublist_parts ps H qs rs H0 in
+       conj
+         (point_set_list_distinct_sublist ps H qs (proj1 H1))
+         (point_set_list_distinct_sublist ps H rs (proj2 H1)). 
+
+(*
   point_set_list_cut
   : forall (p : point) (ps : list point),
     point_list_distinct ps -> 
@@ -1094,50 +1201,22 @@ Axiom app_nil
      nil = xs ++ ys ->
      xs = nil /\ ys = nil.
 
+Arguments app_nil {A} xs ys.
+
 Axiom hd_eq
-  :  forall x xs y ys, x :: xs = y :: ys -> x = y.
+  :  forall (A : Type) (x : A) (xs : list A) (y : A) (ys : list A), x :: xs = y :: ys -> x = y.
+
+Arguments hd_eq {A} {x} {xs} {y} {ys} H.
 
 Axiom tl_eq
-  :  forall x xs y ys, x :: xs = y :: ys -> xs = ys.
+  :  forall (A : Type) (x : A) (xs : list A) (y : A) (ys : list A), x :: xs = y :: ys -> xs = ys.
 
-(*
-*)
-Theorem point_set_list_distinct_parts
-  :  forall ps : list point, point_list_distinct ps ->
-       forall qs rs : list point,
-         ps = qs ++ rs ->
-         (point_list_distinct qs /\ point_list_distinct rs).
-Proof point_list_distinct_ind
-        (fun ps => _)
-        (fun qs rs (H : nil = qs ++ rs)
-          => conj
-               (point_list_distinct_nil || point_list_distinct a @a by (proj1 (app_nil qs rs H)))
-               (point_list_distinct_nil || point_list_distinct a @a by (proj2 (app_nil qs rs H))))
-        (fun p ps (H : point_list_different p ps) (H0 : point_list_distinct ps) 
-          (H1 : forall qs rs, ps = qs ++ rs -> _)
-          => list_ind _ (* qs *)
-               (fun rs (H2 : p :: ps = nil ++ rs)
-                 => conj 
-                      point_list_distinct_nil
-                      (point_list_distinct_cons p ps H H0
-                        || point_list_distinct a @a by H2
-                        || point_list_distinct a @a by app_nil_l rs))
-              (fun q qs
-                (H2 : forall rs, p :: ps = qs ++ rs -> _)
-                rs
-                (H3 : p :: ps = (q :: qs) ++ rs)
-                => (* goal: point_list_distinct (q :: qs) /\ point_list_distinct rs *)
-                   let H4
-                     :  point_list_distinct qs /\ point_list_distinct rs
-                     :  (H1 qs rs (tl_eq H3)) in
-                   conj
-                     (point_list_distinct_cons q qs
-                       (* point_list_different q qs *)
-                      
-             
-          qs rs (H2 : p :: ps = qs ++ rs)
+Arguments tl_eq {A} {x} {xs} {y} {ys} H.
 
-About point_list_distinct_ind.
+Axiom point_list_different_parts
+  :  forall (p : point) (ps qs : list point),
+     point_list_different p (ps ++ qs) ->
+     (point_list_different p ps /\ point_list_different p qs).
 
 (*
 *)
