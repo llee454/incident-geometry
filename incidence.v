@@ -917,14 +917,69 @@ Definition point_list_destr
 Inductive point_list_sublist : list point -> list point -> Prop
   := point_list_sublist_nil : point_list_sublist nil nil
   |  point_list_sublist_out
-     : forall (p0 : point) (ps : list point) (q0 : point) (qs : list point),
-       point_list_sublist (p0 :: ps) qs ->
-       point_list_sublist (p0 :: ps) (q0 :: qs)
+     : forall (ps : list point) (q0 : point) (qs : list point),
+       point_list_sublist ps qs ->
+       point_list_sublist ps (q0 :: qs)
   | point_list_sublist_in
     :  forall (p0 : point) (ps : list point) (q0 : point) (qs : list point),
        p0 = q0 ->
        point_list_sublist ps qs ->
        point_list_sublist (p0 :: ps) (q0 :: qs).
+
+(*
+  Proves that the nil list is a sublist of every
+  other list.
+*)
+Theorem point_list_sublist_nil_xs
+  :  forall ps : list point, point_list_sublist nil ps.
+Proof
+  list_ind
+    (fun ps => point_list_sublist nil ps)
+    point_list_sublist_nil
+    (point_list_sublist_out nil).
+
+(*
+  Proves that every list is a sublist of itself.
+*)
+Theorem point_list_sublist_refl
+  :  forall ps : list point, point_list_sublist ps ps.
+Proof
+  list_ind
+    (fun ps => point_list_sublist ps ps)
+    (point_list_sublist_nil)
+    (fun p0 ps
+      => point_list_sublist_in p0 ps p0 ps (eq_refl p0)).
+
+(*
+  Proves that list prefixes and suffixes are
+  sublists.
+*)
+Theorem point_list_sublist_parts
+  :  forall ps qs : list point,
+       point_list_sublist ps (ps ++ qs) /\
+       point_list_sublist qs (ps ++ qs).
+Proof
+  list_ind
+    (fun ps
+      => forall qs,
+           point_list_sublist ps (ps ++ qs) /\
+           point_list_sublist qs (ps ++ qs))
+    (fun qs
+      => conj
+           (point_list_sublist_nil_xs (nil ++ qs))
+           (point_list_sublist_refl qs
+             || point_list_sublist qs a @a by app_nil_l qs))
+    (fun p0 ps
+      (F : forall qs,
+             point_list_sublist ps (ps ++ qs) /\
+             point_list_sublist qs (ps ++ qs))
+      qs
+      => conj
+           (point_list_sublist_in p0 ps p0 (ps ++ qs)
+             (eq_refl p0)
+             (proj1 (F qs)))
+           (point_list_sublist_out qs p0 (ps ++ qs)
+             (proj2 (F qs)))).
 
 (*
   Provest that if ps is a sublist of qs, then
@@ -935,10 +990,10 @@ Theorem point_list_sublist_subset
 Proof point_list_sublist_ind
        set_list_subset
        (fun p (H : In p nil) => False_ind (In p nil) H)
-       (fun p0 ps q0 qs
-         (_ : point_list_sublist (p0 :: ps) qs)
-         (H0 : set_list_subset (p0 :: ps) qs)
-         => fun p (H1 : In p (p0 :: ps))
+       (fun ps q0 qs
+         (_ : point_list_sublist ps qs)
+         (H0 : set_list_subset ps qs)
+         => fun p (H1 : In p ps)
               => or_intror (q0 = p) (H0 p H1))
        (fun p0 ps q0 qs
          (H0 : p0 = q0)
@@ -955,6 +1010,10 @@ Proof point_list_sublist_ind
                    H2).
 
 (*
+  Accepts a list [ps] and two sublists [qs] and
+  [rs] where [qs] and [rs] are partitions of
+  [ps], and proves that both [qs] and [rs]
+  are subsets of [ps].
 *)
 Theorem set_list_subset_parts
   :  forall (A : Set) (ps qs rs : list A),
@@ -972,16 +1031,6 @@ Proof
               || In r a @a by H).
 
 Arguments set_list_subset_parts {A} ps qs rs.
-
-(*
-*)
-Axiom point_set_list_sublist_parts
-  :  forall ps : list point, point_list_distinct ps ->
-       forall qs rs : list point,
-         ps = qs ++ rs ->
-         point_list_sublist qs ps /\
-         point_list_sublist rs ps.
-  
 
 (*
   Accepts a point [p] and a list [ps] that
@@ -1017,9 +1066,9 @@ Proof
     => point_list_sublist_ind
          (fun qs rs => point_list_distinct rs -> point_list_distinct qs)
          (fun _ => point_list_distinct_nil)
-         (fun q0 qs r0 rs
-           (_  : point_list_sublist (q0 :: qs) rs)
-           (H1 : point_list_distinct rs -> point_list_distinct (q0 :: qs))
+         (fun qs r0 rs
+           (_  : point_list_sublist qs rs)
+           (H1 : point_list_distinct rs -> point_list_distinct qs)
            (H2 : point_list_distinct (r0 :: rs))
            => H1 (point_list_distinct_tail r0 rs H2))
          (fun q0 qs r0 rs
@@ -1046,7 +1095,8 @@ Theorem point_set_list_distinct_parts
   fun ps H qs rs H0
     => let H1
          :  point_list_sublist qs ps /\ point_list_sublist rs ps
-         := point_set_list_sublist_parts ps H qs rs H0 in
+         := point_list_sublist_parts qs rs
+              || point_list_sublist qs a /\ point_list_sublist rs a @a by H0 in
        conj
          (point_set_list_distinct_sublist ps H qs (proj1 H1))
          (point_set_list_distinct_sublist ps H rs (proj2 H1)). 
@@ -1196,29 +1246,95 @@ Proof fun p ps H
              (point_list_In_dec p ps)
              (eq_refl (point_list_In_dec p ps)).
 
-Axiom app_nil
+(*
+  Proves that the prefix and suffix of a nil
+  list must be nil.
+*)
+Theorem app_nil
   :  forall (A : Set) (xs ys : list A),
      nil = xs ++ ys ->
      xs = nil /\ ys = nil.
+Proof
+  fun _ xs
+    => match xs with
+         | nil
+           => fun ys
+                => match ys with
+                     | nil
+                       => fun _
+                            => conj (eq_refl nil) (eq_refl nil)
+                     | y0 :: ys
+                       => fun H : nil = nil ++ (y0 :: ys)
+                            => False_ind _
+                                 (app_cons_not_nil nil ys y0 H)
+              end
+         | x0 :: xs
+           => fun ys (H : nil = x0 :: (xs ++ ys))
+                => False_ind _
+                     (nil_cons H)
+       end.
 
 Arguments app_nil {A} xs ys.
 
-Axiom hd_eq
+(*
+*)
+Theorem hd_eq
   :  forall (A : Type) (x : A) (xs : list A) (y : A) (ys : list A), x :: xs = y :: ys -> x = y.
+Proof
+  fun A x xs y ys H
+    => f_equal (@hd A x) H.
 
 Arguments hd_eq {A} {x} {xs} {y} {ys} H.
 
-Axiom tl_eq
+(*
+*)
+Theorem tl_eq
   :  forall (A : Type) (x : A) (xs : list A) (y : A) (ys : list A), x :: xs = y :: ys -> xs = ys.
+Proof
+  fun A x xs y ys H
+    => f_equal (@tl A) H.
 
 Arguments tl_eq {A} {x} {xs} {y} {ys} H.
 
-Axiom point_list_different_parts
+(*
+*)
+Theorem point_list_different_parts
   :  forall (p : point) (ps qs : list point),
      point_list_different p (ps ++ qs) ->
      (point_list_different p ps /\ point_list_different p qs).
+Proof
+  fun p ps qs H
+    => let H0
+         :  point_list_sublist ps (ps ++ qs) /\
+            point_list_sublist qs (ps ++ qs)
+         := point_list_sublist_parts ps qs in
+       conj
+         (point_list_different_sublist p (ps ++ qs) H ps (proj1 H0))
+         (point_list_different_sublist p (ps ++ qs) H qs (proj2 H0)).
 
 (*
+  iterate over every q0 in qs.
+  if nil we contradict In q qs
+  when q = q0 then ps = q0 :: qs ++ rs
+  then we have point_list_distinct q0 :: qs ++ rs
+  which is point_different q0 (qs ++ rs) 
+  then point_list_different_parts q0 qs rs gives the proof.
+
+  for the r case, we must use proof by contradiction
+  iterate over qs.
+  if nil then our goal is point_list_different r nil, which is trivial
+  if q0 qs then
+    if r = q0
+      then we have point_list_distinct q0 :: qs ++ rs
+      which is equivalent to point_list_different q0 (qs ++ rs)
+      which implies ~ In q0 (qs ++ rs) by point_list_different_not_In
+      but In q0 rs implies In q0 (qs ++ rs) by in_or_app.
+      which gives the contradiction.
+    if r <> q0
+      then we recurse.
+    in this way we proove that forall r, not in qs.
+    which gives us our goal by point_list_not_In_different.
+
 *)
 Axiom point_set_list_different_parts
   :  forall ps : list point, point_list_distinct ps ->
