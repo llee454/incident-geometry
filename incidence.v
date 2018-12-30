@@ -1382,12 +1382,31 @@ Proof list_ind
                      H1)).
 
 (*
+  Proves that if a point is different from every
+  point in two lists, it is different from every
+  point in the list formed by combining them.
 *)
-Conjecture point_list_different_app
+Theorem point_list_different_app
   :  forall (p : point) (ps qs : list point),
        point_list_different p ps ->
        point_list_different p qs ->
        point_list_different p (ps ++ qs).
+Proof
+  fun p ps qs H H0 
+    => sumbool_ind
+         (fun _ => point_list_different p (ps ++ qs))
+         (fun H1 : In p (ps ++ qs)
+           => False_ind
+                (point_list_different p (ps ++ qs))
+                (or_ind
+                  (fun H2 : In p ps
+                    => point_list_different_not_In p ps H H2)
+                  (fun H2 : In p qs
+                    => point_list_different_not_In p qs H0 H2)
+                  (in_app_or ps qs p H1)))
+         (fun H1 : ~ In p (ps ++ qs)
+           => point_list_not_In_different p (ps ++ qs) H1)
+         (point_list_In_dec p (ps ++ qs)).
 
 (*
 *)
