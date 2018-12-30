@@ -286,6 +286,56 @@ Proof
 *) 
 
 (*
+  Proves that the prefix and suffix of a nil
+  list must be nil.
+*)
+Theorem app_nil
+  :  forall (A : Set) (xs ys : list A),
+     nil = xs ++ ys ->
+     xs = nil /\ ys = nil.
+Proof
+  fun _ xs
+    => match xs with
+         | nil
+           => fun ys
+                => match ys with
+                     | nil
+                       => fun _
+                            => conj (eq_refl nil) (eq_refl nil)
+                     | y0 :: ys
+                       => fun H : nil = nil ++ (y0 :: ys)
+                            => False_ind _
+                                 (app_cons_not_nil nil ys y0 H)
+              end
+         | x0 :: xs
+           => fun ys (H : nil = x0 :: (xs ++ ys))
+                => False_ind _
+                     (nil_cons H)
+       end.
+
+Arguments app_nil {A} xs ys.
+
+(*
+*)
+Theorem hd_eq
+  :  forall (A : Type) (x : A) (xs : list A) (y : A) (ys : list A), x :: xs = y :: ys -> x = y.
+Proof
+  fun A x xs y ys H
+    => f_equal (@hd A x) H.
+
+Arguments hd_eq {A} {x} {xs} {y} {ys} H.
+
+(*
+*)
+Theorem tl_eq
+  :  forall (A : Type) (x : A) (xs : list A) (y : A) (ys : list A), x :: xs = y :: ys -> xs = ys.
+Proof
+  fun A x xs y ys H
+    => f_equal (@tl A) H.
+
+Arguments tl_eq {A} {x} {xs} {y} {ys} H.
+
+(*
 *)
 Theorem point_list_In_dec
   :  forall (p : point) (ps : list point),
@@ -300,6 +350,14 @@ Proof in_dec point_eq_dec.
 Definition point_list_different
   :  point -> list point -> Prop
   := fun p qs => Forall (fun q => q <> p) qs.
+
+(*
+  Proves that every point is different from
+  every point contained in the nil list.
+*)
+Theorem point_list_different_nil
+  :  forall p : point, point_list_different p nil.
+Proof fun p => Forall_nil (fun q => q <> p).
 
 (*
   Accepts two arguments, a point, p, and a list
@@ -1054,6 +1112,25 @@ Proof
            => H1 r ((point_list_sublist_subset rs qs H0) r H2)).
 
 (*
+  Proves that if a point is different from a
+  list, it is different from the list's prefix
+  and suffix.
+*)
+Theorem point_list_different_parts
+  :  forall (p : point) (ps qs : list point),
+     point_list_different p (ps ++ qs) ->
+     (point_list_different p ps /\ point_list_different p qs).
+Proof
+  fun p ps qs H
+    => let H0
+         :  point_list_sublist ps (ps ++ qs) /\
+            point_list_sublist qs (ps ++ qs)
+         := point_list_sublist_parts ps qs in
+       conj
+         (point_list_different_sublist p (ps ++ qs) H ps (proj1 H0))
+         (point_list_different_sublist p (ps ++ qs) H qs (proj2 H0)).
+
+(*
   Proves that every sublist of a distinct list
   is also distinct.
 *)
@@ -1247,83 +1324,6 @@ Proof fun p ps H
              (eq_refl (point_list_In_dec p ps)).
 
 (*
-  Proves that the prefix and suffix of a nil
-  list must be nil.
-*)
-Theorem app_nil
-  :  forall (A : Set) (xs ys : list A),
-     nil = xs ++ ys ->
-     xs = nil /\ ys = nil.
-Proof
-  fun _ xs
-    => match xs with
-         | nil
-           => fun ys
-                => match ys with
-                     | nil
-                       => fun _
-                            => conj (eq_refl nil) (eq_refl nil)
-                     | y0 :: ys
-                       => fun H : nil = nil ++ (y0 :: ys)
-                            => False_ind _
-                                 (app_cons_not_nil nil ys y0 H)
-              end
-         | x0 :: xs
-           => fun ys (H : nil = x0 :: (xs ++ ys))
-                => False_ind _
-                     (nil_cons H)
-       end.
-
-Arguments app_nil {A} xs ys.
-
-(*
-*)
-Theorem hd_eq
-  :  forall (A : Type) (x : A) (xs : list A) (y : A) (ys : list A), x :: xs = y :: ys -> x = y.
-Proof
-  fun A x xs y ys H
-    => f_equal (@hd A x) H.
-
-Arguments hd_eq {A} {x} {xs} {y} {ys} H.
-
-(*
-*)
-Theorem tl_eq
-  :  forall (A : Type) (x : A) (xs : list A) (y : A) (ys : list A), x :: xs = y :: ys -> xs = ys.
-Proof
-  fun A x xs y ys H
-    => f_equal (@tl A) H.
-
-Arguments tl_eq {A} {x} {xs} {y} {ys} H.
-
-(*
-  Proves that if a point is different from a
-  list, it is different from the list's prefix
-  and suffix.
-*)
-Theorem point_list_different_parts
-  :  forall (p : point) (ps qs : list point),
-     point_list_different p (ps ++ qs) ->
-     (point_list_different p ps /\ point_list_different p qs).
-Proof
-  fun p ps qs H
-    => let H0
-         :  point_list_sublist ps (ps ++ qs) /\
-            point_list_sublist qs (ps ++ qs)
-         := point_list_sublist_parts ps qs in
-       conj
-         (point_list_different_sublist p (ps ++ qs) H ps (proj1 H0))
-         (point_list_different_sublist p (ps ++ qs) H qs (proj2 H0)).
-
-(*
-  Proves that every point is different from
-  every point contained in the nil list.
-*)
-Theorem point_list_different_nil
-  :  forall p : point, point_list_different p nil.
-Proof fun p => Forall_nil (fun q => q <> p).
-
-(*
   Proves that none of the points in te prefix
   of a discrete list are in the suffix (and
   vice versa).
@@ -1383,7 +1383,7 @@ Proof list_ind
 
 (*
 *)
-Axiom point_list_different_app
+Conjecture point_list_different_app
   :  forall (p : point) (ps qs : list point),
        point_list_different p ps ->
        point_list_different p qs ->
