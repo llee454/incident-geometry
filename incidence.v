@@ -1297,6 +1297,9 @@ Proof
 Arguments tl_eq {A} {x} {xs} {y} {ys} H.
 
 (*
+  Proves that if a point is different from a
+  list, it is different from the list's prefix
+  and suffix.
 *)
 Theorem point_list_different_parts
   :  forall (p : point) (ps qs : list point),
@@ -1313,35 +1316,70 @@ Proof
          (point_list_different_sublist p (ps ++ qs) H qs (proj2 H0)).
 
 (*
-  iterate over every q0 in qs.
-  if nil we contradict In q qs
-  when q = q0 then ps = q0 :: qs ++ rs
-  then we have point_list_distinct q0 :: qs ++ rs
-  which is point_different q0 (qs ++ rs) 
-  then point_list_different_parts q0 qs rs gives the proof.
-
-  for the r case, we must use proof by contradiction
-  iterate over qs.
-  if nil then our goal is point_list_different r nil, which is trivial
-  if q0 qs then
-    if r = q0
-      then we have point_list_distinct q0 :: qs ++ rs
-      which is equivalent to point_list_different q0 (qs ++ rs)
-      which implies ~ In q0 (qs ++ rs) by point_list_different_not_In
-      but In q0 rs implies In q0 (qs ++ rs) by in_or_app.
-      which gives the contradiction.
-    if r <> q0
-      then we recurse.
-    in this way we proove that forall r, not in qs.
-    which gives us our goal by point_list_not_In_different.
-
+  Proves that every point is different from
+  every point contained in the nil list.
 *)
-Axiom point_set_list_different_parts
-  :  forall ps : list point, point_list_distinct ps ->
-       forall qs rs : list point,
-         ps = qs ++ rs ->
-         ((forall r : point, In r rs -> point_list_different r qs) /\
-          (forall q : point, In q qs -> point_list_different q rs)).
+Theorem point_list_different_nil
+  :  forall p : point, point_list_different p nil.
+Proof fun p => Forall_nil (fun q => q <> p).
+
+(*
+  Proves that none of the points in te prefix
+  of a discrete list are in the suffix (and
+  vice versa).
+*)
+Theorem point_set_list_different_parts
+  :  forall qs rs : list point,
+       point_list_distinct (qs ++ rs) ->
+       ((forall r : point, In r rs -> point_list_different r qs) /\
+        (forall q : point, In q qs -> point_list_different q rs)).
+Proof list_ind
+       (fun qs
+         => forall rs,
+              point_list_distinct (qs ++ rs) ->
+                ((forall r, In r rs -> point_list_different r qs) /\
+                 (forall q, In q qs -> point_list_different q rs)))
+       (fun rs (H : point_list_distinct (nil ++ rs))
+         => conj
+              (fun r _ => point_list_different_nil r)
+              (fun q => False_ind (point_list_different q rs)))
+       (fun q0 qs
+         (F : forall rs,
+                point_list_distinct (qs ++ rs) ->
+                ((forall r, In r rs -> point_list_different r qs) /\
+                 (forall q, In q qs -> point_list_different q rs)))
+         rs
+         (H : point_list_distinct (q0 :: qs ++ rs))
+         => let H0
+              :  (forall r, In r rs -> point_list_different r qs) /\
+                 (forall q, In q qs -> point_list_different q rs)
+              := F rs (point_list_distinct_tail q0 (qs ++ rs) H) in
+            let H9
+              :  point_list_different q0 rs
+              := proj2
+                   (point_list_different_parts q0 qs rs
+                     (point_list_distinct_different q0 (qs ++ rs) H)) in
+            conj
+              (fun r (H1 : In r rs)
+                => sumbool_ind
+                     (fun _ => point_list_different r (q0 :: qs))
+                     (fun H2 : q0 = r
+                       => False_ind
+                            (point_list_different r (q0 :: qs))
+                            (point_list_different_not_In r rs
+                              (H9 || point_list_different a rs @a by <- H2)
+                              H1))
+                     (fun H2 : q0 <> r
+                       => Forall_cons q0 H2
+                            ((proj1 H0) r H1))
+                     (point_eq_dec q0 r))
+              (fun q (H1 : In q (q0 :: qs))
+                => or_ind
+                     (fun H2 : q0 = q
+                       => H9 || point_list_different a rs @a by <- H2)
+                     (fun H2 : In q qs
+                       => ((proj2 H0) q H2))
+                     H1)).
 
 (*
 *)
@@ -1378,7 +1416,8 @@ Proof fun p ps H
                              (* goal: point_list_different p (fst qs ++ snd qs) *)
                              (point_list_different_app p (fst qs) (snd qs)
                                (proj1
-                                 (point_set_list_different_parts ps H (fst qs) (p :: snd qs) H2)
+                                 (point_set_list_different_parts (fst qs) (p :: snd qs)
+                                   (H || point_list_distinct a @a by <- H2))
                                  p
                                  (or_introl _ (eq_refl p)))
                                (point_list_distinct_different p (snd qs)
